@@ -1,0 +1,26 @@
+# OS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+env/
+
+# Node JS / Frontend
+node_modules/
+dist/
+.vite/
+
+# Docker
+*.log
+
+# Spark
+spark-warehouse/
+checkpoints/
+spark-checkpoints/
+
+# Env
+.env
