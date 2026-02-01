@@ -18,7 +18,7 @@ services:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
 
-      # Listeners: internal for containers, external for host (nice for debugging)
+      # Listeners: internal for containers, external for host
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
@@ -28,6 +28,17 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+  producer:
+    build: ./services/producer
+    env_file: .env
+    depends_on:
+      - kafka
+    volumes:
+      - ./services/producer/app:/app/app
+      - ./data:/app/data:ro   # TODO, JSONL job desc input
+    working_dir: /app
+    command: ["python", "-m", "app.main"]
 
   postgres:
     image: postgres:16
