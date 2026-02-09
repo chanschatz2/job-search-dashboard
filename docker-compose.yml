@@ -84,9 +84,16 @@ services:
       - postgres
     volumes:
       - ./services/spark/app:/opt/spark-app
-      - spark-checkpoints:/checkpoints
-    # For Day 1: keep it idle so compose is stable.
-    command: ["bash", "-lc", "sleep infinity"]
+      - ./_spark-checkpoints:/checkpoints
+      - ./_spark_ivy:/ivy
+    environment:
+      - PYTHONPATH=/opt/spark-app
+      - SPARK_SUBMIT_OPTS=-Divy.cache.dir=/ivy/cache -Divy.home=/ivy
+    command:
+      - /opt/spark/bin/spark-submit
+      - --packages
+      - org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1,org.postgresql:postgresql:42.7.3
+      - /opt/spark-app/main.py
 
 volumes:
   pgdata:

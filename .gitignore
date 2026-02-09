@@ -21,6 +21,8 @@ dist/
 spark-warehouse/
 checkpoints/
 spark-checkpoints/
+_spark-checkpoints/
+_spark_ivy/
 
 # Env
 .env
