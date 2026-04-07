@@ -1,7 +1,7 @@
 from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql.functions import from_json, col, to_timestamp, lower, coalesce, lit
+from pyspark.sql.functions import from_json, col, to_timestamp, lower, coalesce, lit, window, explode
 from schemas import event_schema
-from sinks import write_to_postgres
+from sinks import write_to_postgres, write_trend_role, write_trend_tech
 from transform import add_role_category, add_techs
 
 
@@ -60,11 +60,58 @@ def main():
 
     #print(events.columns)
     #events.printSchema()
-    
-    # Postgres
-    events.writeStream.foreachBatch(write_to_postgres) \
+
+    # Write batches to Postgres
+
+    # write all jobs to postgres sink
+    jobs_query = events.writeStream.foreachBatch(write_to_postgres) \
         .option("checkpointLocation", "/checkpoints/jobs") \
-        .start().awaitTermination()
+        .start()
+    
+    # trend_tech explode tech array, then aggregate by 5-minute window
+    tech_df = events.withColumn("tech", explode("techs")) \
+        .groupBy(
+            window(col("ingested_at"), "5 minutes"),
+            col("tech")
+        ) \
+        .count() \
+        .select(
+            col("window.start").alias("window_start"),
+            col("window.end").alias("window_end"),
+            lit(300).alias("window_size_sec"),
+            col("tech"),
+            col("count")
+        )
+    
+    # sink tech trends
+    tech_query = tech_df.writeStream.foreachBatch(write_trend_tech) \
+        .outputMode("update") \
+        .option("checkpointLocation", "/checkpoints/trend_tech") \
+        .start()
+
+    # trend_role - aggregate by 5-minute window
+    role_df = events.groupBy(
+            window(col("ingested_at"), "5 minutes"),
+            col("role_category")
+        ) \
+        .count() \
+        .select(
+            col("window.start").alias("window_start"),
+            col("window.end").alias("window_end"),
+            lit(300).alias("window_size_sec"),
+            col("role_category"),
+            col("count")
+        )
+    
+    role_query = role_df.writeStream.foreachBatch(write_trend_role) \
+        .outputMode("update") \
+        .option("checkpointLocation", "/checkpoints/trend_role") \
+        .start()
+    
+    jobs_query.awaitTermination()
+    tech_query.awaitTermination()
+    role_query.awaitTermination()
+
 
 if __name__ == "__main__":
     main()
