@@ -13,7 +13,7 @@ posting_schema = StructType([
 ])
 
 event_schema = StructType([
-    StructField("event_id", StringType(), False), # nullable false i.e. not optional
+    StructField("event_id", StringType(), False), # nullable = false i.e. not optional
     StructField("ingested_at", StringType(), False),
     StructField("source", StringType(), True),
     StructField("posting", posting_schema, False),

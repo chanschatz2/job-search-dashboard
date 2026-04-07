@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   role_category TEXT,
   description TEXT,
   url TEXT,
-  techs JSONB DEFAULT '[]'::jsonb
+  techs TEXT[] DEFAULT ARRAY[]::TEXT[] -- Changed from JSONB to TEXT[] to support Spark raw out
 );
 
 -- Create indexes for retrieval
