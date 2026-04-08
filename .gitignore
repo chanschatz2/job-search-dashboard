@@ -26,6 +26,3 @@ _spark_ivy/
 
 # Env
 .env
-
-# Debug
-test_run.sh

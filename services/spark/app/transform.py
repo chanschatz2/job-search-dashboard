@@ -1,16 +1,31 @@
 from pyspark.sql import DataFrame
 from pyspark.sql.functions import when, col, array, lit, expr
 
-TECH_KEYWORDS = ["python","sql","spark","kafka","aws","docker","react","typescript"]
-ROLE_RULES = ["backend engineer", "frontend engineer", "data scientist", "software engineer"]
+TECH_KEYWORDS = ["python", "sql", "postgres", "docker",
+    "java", "spring", "aws", "kafka",
+    "typescript", "react", "node", "docker", "dbt", "airflow",
+    "go", "kubernetes", "scala", "spark"]
+
+ROLE_RULES = [
+    "Backend Engineer",
+    "Frontend Engineer",
+    "Full Stack Engineer",
+    "Data Engineer",
+    "Software Engineer",
+    "Data Scientist",
+    "Analytics Engineer",
+    "Platform Engineer",
+    "Machine Learning Engineer",
+    "DevOps Engineer",
+]
 
 def add_role_category(df: DataFrame) -> DataFrame:
     expr = None
 
     for role in ROLE_RULES:
-        condition = col("title_l").contains(role) # add a contains() for each role onto expr
+        condition = col("title_l").contains(role.lower()) # add a contains() for each role onto expr
         if expr is None:
-            expr = when(condition, lit(role.title())) # start expression
+            expr = when(condition, lit(role)) # start expression
         else:
             expr = expr.when(condition, lit(role.title())) # add .when() onto expression
 

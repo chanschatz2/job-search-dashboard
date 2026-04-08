@@ -56,11 +56,10 @@ export default function App() {
   const [topTechs, setTopTechs] = useState<TechTopRow[]>([]);
   const [techTimeseries, setTechTimeseries] = useState<TechTimeseriesRow[]>([]);
   const [topRoles, setTopRoles] = useState<RoleTopRow[]>([]);
-
   const [selectedTech, setSelectedTech] = useState<string>("python");
   const [jobLocation, setJobLocation] = useState<string>("");
   const [jobRole, setJobRole] = useState<string>("");
-
+  const [autoRefresh, setAutoRefresh] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,20 +74,15 @@ export default function App() {
     return res.json();
   }
 
-  async function loadDashboardData() {
-    setLoading(true);
+  async function loadDashboardData(currentSelectedTech?: string) {
     setError(null);
 
     try {
       const jobsUrl = new URL(`${API_BASE}/jobs`);
       jobsUrl.searchParams.set("limit", String(jobLimit));
       jobsUrl.searchParams.set("offset", "0");
-      if (jobLocation.trim()) {
-        jobsUrl.searchParams.set("location", jobLocation.trim());
-      }
-      if (jobRole.trim()) {
-        jobsUrl.searchParams.set("role_category", jobRole.trim());
-      }
+      if (jobLocation.trim()) jobsUrl.searchParams.set("location", jobLocation.trim());
+      if (jobRole.trim()) jobsUrl.searchParams.set("role_category", jobRole.trim());
 
       const topTechUrl = new URL(`${API_BASE}/trends/tech/top`);
       topTechUrl.searchParams.set("window_size_sec", String(windowSizeSec));
@@ -108,21 +102,15 @@ export default function App() {
       setTopTechs(topTechData);
       setTopRoles(topRoleData);
 
-      const nextSelectedTech =
-        selectedTech ||
-        topTechData[0]?.tech ||
-        "python";
-
-      setSelectedTech(nextSelectedTech);
+      const techToUse = currentSelectedTech || selectedTech || topTechData[0]?.tech || "python";
+      setSelectedTech(techToUse);
 
       const techSeriesUrl = new URL(`${API_BASE}/trends/tech/timeseries`);
-      techSeriesUrl.searchParams.set("tech", nextSelectedTech);
+      techSeriesUrl.searchParams.set("tech", techToUse);
       techSeriesUrl.searchParams.set("window_size_sec", String(windowSizeSec));
       techSeriesUrl.searchParams.set("limit", "100");
 
-      const techSeriesData = await fetchJson<TechTimeseriesRow[]>(
-        techSeriesUrl.toString()
-      );
+      const techSeriesData = await fetchJson<TechTimeseriesRow[]>(techSeriesUrl.toString());
       setTechTimeseries(techSeriesData);
     } catch (e) {
       setError(String(e));
@@ -132,7 +120,8 @@ export default function App() {
   }
 
   async function loadTechSeries(tech: string) {
-    setError(null);
+    setSelectedTech(tech);
+
     try {
       const techSeriesUrl = new URL(`${API_BASE}/trends/tech/timeseries`);
       techSeriesUrl.searchParams.set("tech", tech);
@@ -140,7 +129,6 @@ export default function App() {
       techSeriesUrl.searchParams.set("limit", "100");
 
       const data = await fetchJson<TechTimeseriesRow[]>(techSeriesUrl.toString());
-      setSelectedTech(tech);
       setTechTimeseries(data);
     } catch (e) {
       setError(String(e));
@@ -152,21 +140,23 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (!autoRefresh) return;
+
+    const id = window.setInterval(() => {
+      loadDashboardData(selectedTech);
+    }, 2500); // 5000
+
+    return () => window.clearInterval(id);
+  }, [autoRefresh, selectedTech, jobLocation, jobRole]);
+
   const techChartData = useMemo(
-    () =>
-      topTechs.map((row) => ({
-        tech: row.tech,
-        count: row.count,
-      })),
+    () => topTechs.map((row) => ({ tech: row.tech, count: row.count })),
     [topTechs]
   );
 
   const roleChartData = useMemo(
-    () =>
-      topRoles.map((row) => ({
-        role_category: row.role_category,
-        count: row.count,
-      })),
+    () => topRoles.map((row) => ({ role_category: row.role_category, count: row.count })),
     [topRoles]
   );
 
@@ -184,18 +174,14 @@ export default function App() {
       <h1>MarketPulse Dashboard</h1>
       <p>Streaming job market trends from Kafka → Spark → Postgres</p>
 
-      <div style={{ marginBottom: 16 }}>
-        <button onClick={loadDashboardData}>Refresh Dashboard</button>
+      <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+        <button onClick={() => loadDashboardData(selectedTech)}>Refresh Dashboard</button>
+        <button onClick={() => setAutoRefresh((v) => !v)}>
+          {autoRefresh ? "Stop Auto Refresh" : "Start Auto Refresh"}
+        </button>
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          gap: 12,
-          marginBottom: 20,
-          flexWrap: "wrap",
-        }}
-      >
+      <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
         <div>
           <label>
             Location:{" "}
@@ -219,21 +205,14 @@ export default function App() {
         </div>
 
         <div>
-          <button onClick={loadDashboardData}>Apply Filters</button>
+          <button onClick={() => loadDashboardData(selectedTech)}>Apply Filters</button>
         </div>
       </div>
 
       {loading && <p>Loading dashboard...</p>}
       {error && <pre style={{ color: "crimson", whiteSpace: "pre-wrap" }}>{error}</pre>}
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 24,
-          marginBottom: 32,
-        }}
-      >
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 32 }}>
         <div style={{ minHeight: 320 }}>
           <h2>Top Technologies</h2>
           <ResponsiveContainer width="100%" height={300}>
@@ -242,17 +221,14 @@ export default function App() {
               <XAxis dataKey="tech" />
               <YAxis />
               <Tooltip />
-              <Bar dataKey="count" />
+              <Bar dataKey="count" onClick={(data: any) => data?.tech && loadTechSeries(data.tech)} />
             </BarChart>
           </ResponsiveContainer>
 
           <div style={{ marginTop: 12 }}>
             <label>
               Selected Tech:{" "}
-              <select
-                value={selectedTech}
-                onChange={(e) => loadTechSeries(e.target.value)}
-              >
+              <select value={selectedTech} onChange={(e) => loadTechSeries(e.target.value)}>
                 {topTechs.map((row) => (
                   <option key={row.tech} value={row.tech}>
                     {row.tech}
@@ -293,10 +269,7 @@ export default function App() {
 
       <div>
         <h2>Recent Jobs</h2>
-        <table
-          cellPadding={8}
-          style={{ borderCollapse: "collapse", width: "100%" }}
-        >
+        <table cellPadding={8} style={{ borderCollapse: "collapse", width: "100%" }}>
           <thead>
             <tr>
               <th align="left">Time</th>
